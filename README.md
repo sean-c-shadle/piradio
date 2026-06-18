@@ -35,7 +35,7 @@ find device MAC
 ```
 XX:XX:XX:XX:XX:XX Example speakers
 ```
-
+Now pair and add as trusted:
 ```
 pair XX:XX:XX:XX:XX:XX
 trust XX:XX:XX:XX:XX:XX
@@ -89,9 +89,11 @@ audio_output {
 }
 ```
 
+
 # Start as systemd services on boot
 
 Note that this relies on the connect-bluetooth-speaker.sh script. The MAC address for the paired and trusted bluetooth speakers needs to be set in that file first!
+
 ~/.config/systemd/user/bluetooth-speaker-connect.service
 ```
 [Unit]
