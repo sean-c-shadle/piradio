@@ -14,7 +14,7 @@ Linux piradio 6.18.34+rpt-rpi-v8 #1 SMP PREEMPT Debian 1:6.18.34-1+rpt1 (2026-06
 ## Install dependencies
 ```sh
 sudo apt update
-sudo apt install pulseaudio pulseaudio-module-bluetooth mpd mpc python3-gpiozero
+sudo apt install pulseaudio pulseaudio-module-bluetooth mpd mpc python3-gpiozero python3-pil python3-numpy fonts-dejavu
 ```
 
 ## connect bluetooth device
