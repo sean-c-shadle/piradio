@@ -1,7 +1,8 @@
 # piradio
 python code for running DIY raspberry pi internet radio. Tested on pi zero 2w with Adafruit Mini PiTFT 1.3" - 240x240 TFT Add-on screen add-on.
 
-Note I also added a power button to GPIO5. See layout here: https://pinout.xyz/
+Note I also added a power button to GPIO5 that can power off the pi if held for 1 second. See layout here: https://pinout.xyz/
+If this is desired, a momentary switch needs to be added to GPIO5. This pin apparently cannot power on the pi but makes for a safe poweroff.
 
 Follow guide here to get the 1.3" display to work: https://learn.adafruit.com/adafruit-mini-pitft-135x240-color-tft-add-on-for-raspberry-pi/1-3-240x240-kernel-module-install
 
@@ -168,4 +169,22 @@ systemctl --user start piradio.service
 make sure user stays logged in
 ```
 sudo loginctl enable-linger sean
+```
+
+
+# Hard coding station names
+Since the streams sometimes fail to resolve the station names correctly (giving unreadable url), I have hardcoded station names into piradio.py.
+
+For example, within piradio.py the STATION_NAMES dictionary needs to be changed if stations are added/deleted:
+```python
+# hard-coded station names here (need to add name if new station added)
+STATION_NAMES = {
+    1: "NTS Radio 1",
+    2: "KUAA",
+    3: "NTS Metal",
+    4: "KUER (NPR)",
+    5: "BBC",
+    6: "NTS Radio 2",
+    7: "NTS Ambient"
+}
 ```
