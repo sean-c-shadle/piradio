@@ -51,6 +51,7 @@ STATION_NAMES = {
     7: "NTS Ambient"
 }
 
+
 # ----------------------------
 # GPIO buttons
 # ----------------------------
@@ -459,6 +460,8 @@ def main():
     
     # Make next wrap back to station 1 after the final playlist item.
     run_mpc_command("repeat", "on")
+
+    run_mpc_command("load", "my_playlist")
 
     update_display(force=True)
 
