@@ -4,11 +4,19 @@ from gpiozero import Button
 from signal import pause
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
+from evdev import InputDevice, categorize, ecodes, list_devices
 import subprocess
 import textwrap
 import threading
 import time
 
+
+# ----------------------------
+# Bluetooth configuration
+# ----------------------------
+
+# replace name with relevant bluetooth device found with evtest
+BT_INPUT_NAME_MATCH = "EDIFIER"
 
 # ----------------------------
 # Button configuration
@@ -83,7 +91,6 @@ power_button = Button(
 last_displayed_text = None
 display_lock = threading.Lock()
 
-
 def log(message):
     now = datetime.now().strftime("%H:%M:%S")
     print(f"{now}  {message}", flush=True)
@@ -110,6 +117,7 @@ def run_mpc_command(*args):
 
     return result
 
+
 def get_playback_state():
     result = run_command([*MPC_COMMAND])
 
@@ -126,6 +134,35 @@ def get_playback_state():
         return "paused"
 
     return "stopped"
+
+def start_playback():
+    log("Starting playback")
+    run_mpc_command("play")
+    time.sleep(0.5)
+
+    # Fallback in case MPD has a queue but no selected item
+    if get_playback_state() != "playing":
+        log("mpc play did not start; trying mpc play 1")
+        run_mpc_command("play", "1")
+        time.sleep(0.5)
+
+    update_display(force=True)
+
+def stop_playback():
+    log("Stopping playback")
+    run_mpc_command("stop")
+    time.sleep(0.3)
+    update_display(force=True)
+
+def toggle_play_pause():
+    state = get_playback_state()
+
+    log(f"GPIO 23 pressed: state is {state}")
+
+    if state == "playing":
+        stop_playback()
+    else:
+        start_playback()
 
 def get_current_text():
     state = get_playback_state()
@@ -150,6 +187,7 @@ def get_current_text():
 
     if not text:
         return "Nothing playing"
+    update_display(force=True)
 
     if SHOW_STATION_ONLY and ":" in text:
         text = text.split(":", 1)[0].strip()
@@ -317,34 +355,6 @@ def update_display(force=False):
 
         last_displayed_text = text
 
-def toggle_play_pause():
-    state = get_playback_state()
-
-    log(f"GPIO 23 pressed: state is {state}")
-
-    if state == "playing":
-        run_mpc_command("stop")
-        time.sleep(0.3)
-        update_display(force=True)
-        return
-
-    if state == "paused":
-        run_mpc_command("play")
-        time.sleep(0.3)
-        update_display(force=True)
-        return
-
-    if state == "stopped":
-        run_mpc_command("play")
-        time.sleep(0.5)
-        update_display(force=True)
-        return
-
-    # Fallback if state is unknown
-    run_mpc_command("play")
-    time.sleep(0.5)
-    update_display(force=True)
-
 def next_station():
     log("GPIO 24 pressed: next")
     run_mpc_command("next")
@@ -445,6 +455,69 @@ def power_off():
         check=False
     )
 
+def find_bluetooth_input_device():
+    for path in list_devices():
+        try:
+            dev = InputDevice(path)
+            if BT_INPUT_NAME_MATCH.lower() in dev.name.lower():
+                return path
+        except OSError:
+            pass
+    return None
+
+def previous_station():
+    log("Bluetooth previous")
+    run_mpc_command("prev")
+    time.sleep(0.5)
+    update_display(force=True)
+
+def bluetooth_button_loop():
+    path = find_bluetooth_input_device()
+
+    if not path:
+        log(f"No Bluetooth input device matching {BT_INPUT_NAME_MATCH!r} found")
+        return
+
+    try:
+        dev = InputDevice(path)
+        log(f"Bluetooth input listening on {path}: {dev.name}")
+    except Exception as e:
+        log(f"Could not open Bluetooth input device {path}: {e}")
+        return
+
+    for event in dev.read_loop():
+        if event.type != ecodes.EV_KEY:
+            continue
+
+        # value 1 = key press
+        # value 0 = key release
+        # We only act on key press to avoid double-triggering.
+        if event.value != 1:
+            continue
+
+        key = categorize(event)
+
+        keycode = key.keycode
+        if isinstance(keycode, list):
+            keycode = keycode[0]
+
+        log(f"Bluetooth button: {keycode}")
+
+        if keycode == "KEY_NEXTSONG":
+            next_station()
+
+        elif keycode == "KEY_PREVIOUSSONG":
+            previous_station()
+
+        elif keycode == "KEY_PLAYCD":
+            log("Bluetooth play")
+            start_playback()
+
+        elif keycode == "KEY_PAUSECD":
+            log("Bluetooth stop")
+            stop_playback()
+
+
 def main():
     play_pause_button.when_pressed = toggle_play_pause
     next_button.when_pressed = next_station
@@ -462,12 +535,13 @@ def main():
     run_mpc_command("repeat", "on")
     
     run_mpc_command("clear")
-    
+
     run_mpc_command("load", "my_playlist")
 
     update_display(force=True)
 
     threading.Thread(target=display_loop, daemon=True).start()
+    threading.Thread(target=bluetooth_button_loop, daemon=True).start()
 
     pause()
 
