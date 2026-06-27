@@ -472,51 +472,57 @@ def previous_station():
     update_display(force=True)
 
 def bluetooth_button_loop():
-    path = find_bluetooth_input_device()
+    while True:
+        path = find_bluetooth_input_device()
 
-    if not path:
-        log(f"No Bluetooth input device matching {BT_INPUT_NAME_MATCH!r} found")
-        return
-
-    try:
-        dev = InputDevice(path)
-        log(f"Bluetooth input listening on {path}: {dev.name}")
-    except Exception as e:
-        log(f"Could not open Bluetooth input device {path}: {e}")
-        return
-
-    for event in dev.read_loop():
-        if event.type != ecodes.EV_KEY:
+        if not path:
+            log(f"No Bluetooth input device matching {BT_INPUT_NAME_MATCH!r} found; retrying")
+            time.sleep(5)
             continue
 
-        # value 1 = key press
-        # value 0 = key release
-        # We only act on key press to avoid double-triggering.
-        if event.value != 1:
-            continue
+        try:
+            dev = InputDevice(path)
+            log(f"Bluetooth input listening on {path}: {dev.name}")
 
-        key = categorize(event)
+            for event in dev.read_loop():
+                if event.type != ecodes.EV_KEY:
+                    continue
 
-        keycode = key.keycode
-        if isinstance(keycode, list):
-            keycode = keycode[0]
+                # value 1 = key press
+                # value 0 = key release
+                # Only act on key press to avoid double-triggering.
+                if event.value != 1:
+                    continue
 
-        log(f"Bluetooth button: {keycode}")
+                key = categorize(event)
 
-        if keycode == "KEY_NEXTSONG":
-            next_station()
+                keycode = key.keycode
+                if isinstance(keycode, list):
+                    keycode = keycode[0]
 
-        elif keycode == "KEY_PREVIOUSSONG":
-            previous_station()
+                log(f"Bluetooth button: {keycode}")
 
-        elif keycode == "KEY_PLAYCD":
-            log("Bluetooth play")
-            start_playback()
+                if keycode == "KEY_NEXTSONG":
+                    next_station()
 
-        elif keycode == "KEY_PAUSECD":
-            log("Bluetooth stop")
-            stop_playback()
+                elif keycode == "KEY_PREVIOUSSONG":
+                    previous_station()
 
+                elif keycode == "KEY_PLAYCD":
+                    log("Bluetooth play")
+                    start_playback()
+
+                elif keycode == "KEY_PAUSECD":
+                    log("Bluetooth stop")
+                    stop_playback()
+
+        except OSError as e:
+            log(f"Bluetooth input device lost: {e}; reconnecting")
+            time.sleep(2)
+
+        except Exception as e:
+            log(f"Bluetooth input error: {e}; reconnecting")
+            time.sleep(2)
 
 def main():
     play_pause_button.when_pressed = toggle_play_pause
